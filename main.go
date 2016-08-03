@@ -1,25 +1,36 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net"
 	"net/mail"
 	"net/smtp"
+	"os"
 	"strings"
 )
 
 var (
 	dnsCache = make(map[string]string)
+	emails   = flag.String("addrs", "", "List of email addresses separeted by commas.")
 )
 
 func main() {
+	flag.Parse()
+
 	addrs := []string{}
+	for _, e := range strings.Split(*emails, ",") {
+		trimmed := strings.TrimSpace(e)
+		if trimmed != "" {
+			addrs = append(addrs, trimmed)
+		}
+	}
 	for _, addr := range addrs {
 		ok, err := accountExists(addr)
 		if err != nil {
-			fmt.Println(err)
+			log("[error] " + addr + ": " + err.Error())
 		}
-		fmt.Println(fmt.Sprintf("%v, %v", addr, ok))
+		logData(fmt.Sprintf("%v, %v", addr, ok))
 	}
 }
 
@@ -28,23 +39,23 @@ func accountExists(email string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	// fmt.Println("smtp: connecting", server)
+	log("smtp: connecting", server)
 	conn, err := smtp.Dial(server + ":25")
 	if err != nil {
 		return false, err
 	}
-	// fmt.Println("smtp: connect")
+	log("smtp: connect")
 	defer conn.Quit()
 
 	if err := conn.Mail("sender@example.com"); err != nil {
 		return false, err
 	}
-	// fmt.Println("smtp: from")
+	log("smtp: from")
 
 	if err := conn.Rcpt(email); err != nil {
 		return false, nil
 	}
-	// fmt.Println("smtp: to")
+	log("smtp: to")
 	return true, nil
 }
 
@@ -76,4 +87,12 @@ func findMailserver(rawEmail string) (string, error) {
 	}
 	dnsCache[host] = mxs[0].Host
 	return mxs[0].Host, nil
+}
+
+func logData(s ...interface{}) {
+	fmt.Fprintln(os.Stdout, s...)
+}
+
+func log(s ...interface{}) {
+	fmt.Fprintln(os.Stderr, s...)
 }
